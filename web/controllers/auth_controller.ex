@@ -1,57 +1,22 @@
-defmodule Discuss.TopicController do
+defmodule Discuss.AuthController do
   use Discuss.Web, :controller
-  alias Discuss.Topic
+  plug Ueberauth
+  alias Discuss.User
 
-  def index(conn, _param) do
-    topics = Repo.all(Topic)
-    render conn, "index.html", topics: topics
+  def callback(%{assigns: %{ueberauth_auth: auth}} = conn, params) do
+    user_params = %{token: auth.credentials.token, email: auth.info.email, provider: "github"}
+    changeset = User.changeset(%User{}, user_params)
+
+    insert_or_update_user(changeset)
   end
 
-  def new(conn, _params) do
-    changeset = Topic.changeset(%Topic{}, %{})
-    render conn, "new.html", changeset: changeset
-  end
-
-  def create(conn, %{"topic" => topic}) do
-    changeset = Topic.changeset(%Topic{}, topic)
-
-    case Repo.insert(changeset) do
-      {:ok, _post} ->
-        conn
-        |> put_flash(:info, "Topic Created")
-        |> redirect(to: topic_path(conn, :index))
-      {:error, changeset} ->
-        render conn, "new.html", changeset: changeset
+  defp insert_or_update_user(changeset) do
+    case Repo.get_by(User, email: changeset.changes.email) do
+      nil ->
+        Repo.insert(changeset)
+      user ->
+        {:ok, user}
     end
-  end
-
-  def edit(conn, %{"id" => topic_id}) do
-    topic = Repo.get(Topic, topic_id)
-    changeset = Topic.changeset(topic)
-
-    render conn, "edit.html", changeset: changeset, topic: topic
-  end
-
-  def update(conn, %{"id" => topic_id, "topic" => topic}) do
-    old_topic = Repo.get(Topic, topic_id)
-    changeset = Topic.changeset(old_topic, topic)
-
-    case Repo.update(changeset) do
-      {:ok, _post} ->
-        conn
-        |> put_flash(:info, "Topic Updated")
-        |> redirect(to: topic_path(conn, :index))
-      {:error, changeset} ->
-        render conn, "edit.html", changeset: changeset, topic: old_topic
-    end
-  end
-
-  def delete(conn, %{"id" => topic_id}) do
-    Repo.get!(Topic, topic_id) |> Repo.delete!
-
-    conn
-    |> put_flash(:info, "Topic Deleted")
-    |> redirect(to: topic_path(conn, :index))
   end
 
 end
